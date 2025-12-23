@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resume Editor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; min-height: 100vh; }
+    
+    .toolbar { position: fixed; top: 0; left: 0; right: 0; background: #16213e; padding: 5px 8px; display: flex; gap: 3px; align-items: center; flex-wrap: wrap; z-index: 1000; border-bottom: 2px solid #0f3460; }
+    .toolbar-group { display: flex; align-items: center; gap: 2px; padding: 0 5px; border-right: 1px solid #0f3460; }
+    .toolbar-group:last-child { border-right: none; }
+    .toolbar label { color: #a0a0a0; font-size: 9px; }
+    .toolbar select, .toolbar input[type="number"] { background: #0f3460; color: #fff; border: 1px solid #1a1a2e; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
+    .toolbar input[type="number"] { width: 40px; }
+    .toolbar input[type="color"] { width: 20px; height: 18px; border: none; cursor: pointer; border-radius: 2px; }
+    .toolbar button { background: #e94560; color: #fff; border: none; padding: 4px 6px; border-radius: 3px; cursor: pointer; font-size: 10px; transition: background 0.2s; white-space: nowrap; }
+    .toolbar button:hover { background: #ff6b6b; }
+    .toolbar button.secondary { background: #0f3460; }
+    .toolbar button.secondary:hover { background: #1a4a7a; }
+    .toolbar button:disabled { background: #444; cursor: not-allowed; opacity: 0.5; }
+    
+    .resume-container { margin-top: 70px; padding: 20px; display: flex; justify-content: center; }
+    .resume { width: 210mm; min-height: 297mm; background: #fff; display: grid; grid-template-columns: 1fr 170px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    .main-column { padding: 18px 22px; background: #fff; }
+    .side-column { background: #2d3436; color: #fff; padding: 18px 12px; border-left: 3px solid #e94560; }
+    
+    .block { margin-bottom: 12px; cursor: move; position: relative; padding: 3px; border: 2px dashed transparent; transition: border-color 0.2s; }
+    .block:hover { border-color: #e94560; }
+    .block.dragging { opacity: 0.5; }
+    .block.drag-over { border-color: #00ff00; background: rgba(0,255,0,0.1); }
+    .block.protected:hover { border-color: #3498db; }
+    
+    .block-controls { position: absolute; top: 2px; right: 2px; display: none; gap: 2px; background: rgba(0,0,0,0.7); padding: 2px; border-radius: 3px; }
+    .block:hover .block-controls { display: flex; }
+    .block-controls button { background: #e94560; color: #fff; border: none; width: 18px; height: 18px; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1; }
+    .block-controls button:hover { background: #ff6b6b; }
+    .block-controls button.clear-btn { background: #f39c12; }
+    .block-controls button.clear-btn:hover { background: #f1c40f; }
+    
+    .lang-item { position: relative; padding-right: 20px; }
+    .lang-item .delete-lang { position: absolute; right: 0; top: 0; background: #e94560; color: #fff; border: none; width: 14px; height: 14px; border-radius: 2px; cursor: pointer; font-size: 8px; line-height: 1; display: none; }
+    .lang-item:hover .delete-lang { display: block; }
+    
+    [contenteditable] { outline: none; min-height: 1em; }
+    [contenteditable]:focus { background: rgba(233, 69, 96, 0.1); }
+    
+    .name { font-size: 22px; font-weight: bold; color: #2d3436; margin-bottom: 3px; }
+    .title { font-size: 10px; color: #636e72; margin-bottom: 2px; }
+    .contact-info { font-size: 9px; color: #636e72; }
+    .summary { font-size: 9px; color: #555; line-height: 1.3; margin-top: 6px; }
+    .section-title { font-size: 11px; font-weight: bold; color: #2d3436; border-bottom: 2px solid #e94560; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase; }
+    .side-section-title { font-size: 10px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
+    .job-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1px; }
+    .job-title { font-size: 10px; font-weight: bold; color: #2d3436; }
+    .job-date { font-size: 8px; color: #888; }
+    .job-company { font-size: 9px; color: #e94560; margin-bottom: 3px; }
+    .job-description { font-size: 8px; color: #555; line-height: 1.4; }
+    .tech-stack { font-size: 7px; color: #777; margin-top: 4px; }
+    .tech-label { font-weight: bold; }
+    .skills-cloud { display: flex; flex-wrap: wrap; gap: 4px; }
+    .skill-tag { font-size: 7px; padding: 2px 6px; background: rgba(255,255,255,0.15); border-radius: 10px; cursor: default; border: 1px solid rgba(255,255,255,0.3); }
+    .lang-item { font-size: 8px; margin-bottom: 4px; }
+    .lang-level { font-size: 7px; opacity: 0.7; }
+    .contact-item { font-size: 8px; margin-bottom: 4px; word-break: break-all; }
+    .contact-item a { text-decoration: underline; }
+    .edu-item { margin-bottom: 5px; }
+    .edu-name { font-size: 8px; }
+    .edu-details { font-size: 7px; opacity: 0.7; }
+    
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+    .modal.active { display: flex; }
+    .modal-content { background: #16213e; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal-content h3 { color: #fff; margin-bottom: 15px; }
+    .modal-content input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #0f3460; border-radius: 4px; background: #0f3460; color: #fff; }
+    .modal-content .btn-row { display: flex; gap: 10px; margin-top: 15px; }
+    .modal-content button { flex: 1; }
+    .resume-list { list-style: none; }
+    .resume-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #0f3460; margin-bottom: 8px; border-radius: 4px; }
+    .resume-list li span { color: #fff; font-size: 13px; cursor: pointer; flex: 1; }
+    .resume-list li span:hover { color: #e94560; }
+    .resume-list li .delete-btn { background: #e94560; color: #fff; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
+    .resume-list .empty { color: #888; text-align: center; padding: 20px; }
+    
+    @media print {
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+      body { background: #fff !important; }
+      .toolbar, .block-controls, .modal, .delete-lang { display: none !important; }
+      .resume-container { margin-top: 0; padding: 0; }
+      .resume { box-shadow: none; }
+      .block { border: none !important; cursor: default; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button id="undoBtn" class="secondary" onclick="undo()" disabled>↶</button>
+      <button id="redoBtn" class="secondary" onclick="redo()" disabled>↷</button>
+    </div>
+    <div class="toolbar-group">
+      <label>Font:</label>
+      <select id="fontFamily">
+        <option value="Segoe UI">Segoe UI</option>
+        <option value="Arial">Arial</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Times New Roman">Times</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <label>Sz:</label>
+      <input type="number" id="fontSize" value="8" min="6" max="14">
+      <label>Ln:</label>
+      <input type="number" id="lineHeight" value="1.3" min="0.8" max="2.5" step="0.05">
+    </div>
+    <div class="toolbar-group">
+      <label>Acc:</label>
+      <input type="color" id="accentColor" value="#e94560">
+      <label>BG:</label>
+      <input type="color" id="sideBg" value="#2d3436">
+      <label>Txt:</label>
+      <input type="color" id="sideText" value="#ffffff">
+      <label>Tag:</label>
+      <input type="color" id="tagBg" value="#ffffff26">
+    </div>
+    <div class="toolbar-group">
+      <button class="secondary" onmousedown="event.preventDefault(); formatText('bold')" title="Bold"><b>B</b></button>
+      <button class="secondary" onmousedown="event.preventDefault(); formatText('italic')" title="Italic"><i>I</i></button>
+      <button class="secondary" onmousedown="event.preventDefault(); formatText('underline')" title="Underline"><u>U</u></button>
+      <button class="secondary" onmousedown="event.preventDefault(); addLink()" title="Add Link">🔗</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="secondary" onclick="addJobBlock()">+Job</button>
+      <button class="secondary" onclick="addSkill()">+Tag</button>
+      <button class="secondary" onclick="addLanguage()">+Lang</button>
+      <button class="secondary" onclick="addBlock('main')">+Sec</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="secondary" onclick="showNewModal()">📄</button>
+      <button class="secondary" onclick="showSaveModal()">💾</button>
+      <button class="secondary" onclick="showLoadModal()">📂</button>
+      <button onclick="exportPDF()">PDF</button>
+    </div>
+  </div>
+
+  <div class="modal" id="saveModal">
+    <div class="modal-content">
+      <h3>💾 Save Resume</h3>
+      <input type="text" id="saveName" placeholder="Resume name (e.g. Google, Frontend)">
+      <div class="btn-row">
+        <button class="secondary" onclick="closeModals()">Cancel</button>
+        <button onclick="saveResume()">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="modal" id="loadModal">
+    <div class="modal-content">
+      <h3>📂 Saved Resumes</h3>
+      <ul class="resume-list" id="resumeList"></ul>
+      <div class="btn-row">
+        <button class="secondary" onclick="closeModals()">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="modal" id="newModal">
+    <div class="modal-content">
+      <h3>📄 Create New Resume</h3>
+      <p style="color:#aaa;margin-bottom:15px;font-size:13px;">This will replace current resume with a blank template.</p>
+      <div class="btn-row">
+        <button class="secondary" onclick="closeModals()">Cancel</button>
+        <button onclick="createNewResume()">Create New</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="resume-container">
+    <div class="resume" id="resume">
+      <div class="main-column" id="mainColumn">
+        <div class="block protected" draggable="true" data-protected="header">
+          <div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div>
+          <div class="name" contenteditable="true">Titov Vyacheslav</div>
+          <div class="title" contenteditable="true">Golang Developer | invicto.via@gmail.com | +90 551 085-6190</div>
+          <div class="contact-info" contenteditable="true">Chișinău, Moldova</div>
+        </div>
+        
+        <div class="block protected" draggable="true" data-protected="about">
+          <div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div>
+          <div class="section-title" contenteditable="true">About me</div>
+          <div class="summary" contenteditable="true">Enthusiastic Golang developer with a love for travel—visited over 15 countries so far. Passionate about tech and always eager to learn something new.</div>
+        </div>
+        
+        <div class="block protected" draggable="true" data-protected="experience">
+          <div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div>
+          <div class="section-title" contenteditable="true">Work experience</div>
+          <div class="job-header">
+            <div class="job-title" contenteditable="true">Golang Developer</div>
+            <div class="job-date" contenteditable="true">December 2024 — Present</div>
+          </div>
+          <div class="job-company" contenteditable="true">Avenga</div>
+          <div class="job-description" contenteditable="true">• Developed CRM system for online schools with Golang, Kafka, PostgreSQL, supporting 10+ microservices.<br>• Streamed user activity data on tests and videos to ClickHouse for analytics via Kafka.<br>• Built endpoints for mentor scheduling and workload; wrote SQL queries to calculate mentor earnings.<br>• Integrated accounting and payroll data with SAP.<br>• Created leaderboards with daily achievement tracking for students using cron jobs.<br>• Added course performance metrics to Grafana, including test completions and error tracking.<br>• Fixed service configurations with Helm and resolved Kubernetes issues using log analysis.</div>
+          <div class="tech-stack"><span class="tech-label">Tech Stack:</span> Golang, PostgreSQL, Kafka, Redis, Docker, GitLab CI/CD, Testify, Linux, Kubernetes, Prometheus, Grafana, gRPC, ELK, ClickHouse</div>
+        </div>
+        
+        <div class="block" draggable="true">
+          <div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div>
+          <div class="job-header">
+            <div class="job-title" contenteditable="true">Python Developer</div>
+            <div class="job-date" contenteditable="true">May 2021 — December 2024</div>
+          </div>
+          <div class="job-company" contenteditable="true">EPAM</div>
+          <div class="job-description" contenteditable="true">• Developed one of Europe's largest online flower shops using Python, FastAPI, Django, and PostgreSQL.<br>• Built bouquet generator in a FastAPI microservice based on user preferences.</div>
+        </div>
+        
+        <div class="block" draggable="true">
+          <div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div>
+          <div class="job-header">
+            <div class="job-title" contenteditable="true">Software Engineer</div>
+            <div class="job-date" contenteditable="true">March 2019 — May 2021</div>
+          </div>
+          <div class="job-company" contenteditable="true">Bell Integrator</div>
+          <div class="job-description" contenteditable="true">Information Technology & Services</div>
+        </div>
+        
+        <div class="block" draggable="true">
+          <div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div>
+          <div class="section-title" contenteditable="true">Education</div>
+          <div class="edu-name" contenteditable="true">Universitatea Tehnică a Moldovei, Bachelor's degree 2016</div>
+        </div>
+        
+        <div class="block" draggable="true">
+          <div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div>
+          <div class="section-title" contenteditable="true">Courses</div>
+          <div class="edu-name" contenteditable="true">gRPC [Golang] Master Class: Build Modern API & Microservices</div>
+          <div class="edu-details" contenteditable="true">Udemy 2024</div>
+        </div>
+      </div>
+      
+      <div class="side-column" id="sideColumn">
+        <div class="block protected" draggable="true" data-protected="contacts">
+          <div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div>
+          <div class="side-section-title" contenteditable="true">Contacts</div>
+          <div class="contact-item"><a href="https://t.me/invicto_via">https://t.me/invicto_via</a></div>
+          <div class="contact-item"><a href="https://www.linkedin.com/in/invictovia">www.linkedin.com/in/invictovia</a></div>
+        </div>
+        
+        <div class="block protected" draggable="true" data-protected="languages">
+          <div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div>
+          <div class="side-section-title" contenteditable="true">Languages</div>
+          <div id="languagesContainer">
+            <div class="lang-item"><div contenteditable="true">English</div><div class="lang-level" contenteditable="true">C1 - Advanced</div><button class="delete-lang" onclick="deleteLang(this)">✕</button></div>
+            <div class="lang-item"><div contenteditable="true">Romanian</div><div class="lang-level" contenteditable="true">C2 - Proficiency</div><button class="delete-lang" onclick="deleteLang(this)">✕</button></div>
+            <div class="lang-item"><div contenteditable="true">Russian</div><div class="lang-level" contenteditable="true">C2 - Proficiency</div><button class="delete-lang" onclick="deleteLang(this)">✕</button></div>
+          </div>
+        </div>
+        
+        <div class="block protected" draggable="true" data-protected="skills">
+          <div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div>
+          <div class="side-section-title" contenteditable="true">Skills</div>
+          <div id="skillsContainer" class="skills-cloud">
+            <span class="skill-tag" contenteditable="true">Golang</span>
+            <span class="skill-tag" contenteditable="true">PostgreSQL</span>
+            <span class="skill-tag" contenteditable="true">Kafka</span>
+            <span class="skill-tag" contenteditable="true">NATS</span>
+            <span class="skill-tag" contenteditable="true">AWS</span>
+            <span class="skill-tag" contenteditable="true">Prometheus</span>
+            <span class="skill-tag" contenteditable="true">Grafana</span>
+            <span class="skill-tag" contenteditable="true">gRPC</span>
+            <span class="skill-tag" contenteditable="true">ClickHouse</span>
+            <span class="skill-tag" contenteditable="true">Redis</span>
+            <span class="skill-tag" contenteditable="true">Docker</span>
+            <span class="skill-tag" contenteditable="true">ELK</span>
+            <span class="skill-tag" contenteditable="true">GitLab CI</span>
+            <span class="skill-tag" contenteditable="true">Kubernetes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let history = [], historyIndex = -1, isUndoRedo = false, saveTimeout = null;
+    const STORAGE_KEY = 'resume_current', SETTINGS_KEY = 'resume_settings', LIST_KEY = 'resume_list';
+    
+    const defaultResume = `<div class="main-column" id="mainColumn">
+        <div class="block protected" draggable="true" data-protected="header"><div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div><div class="name" contenteditable="true">Иван Иванов</div><div class="title" contenteditable="true">Software Developer | ivan@email.com | +7 999 123-4567</div><div class="contact-info" contenteditable="true">Москва, Россия</div></div>
+        <div class="block protected" draggable="true" data-protected="about"><div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div><div class="section-title" contenteditable="true">About me</div><div class="summary" contenteditable="true">Опытный разработчик с 5+ годами опыта в создании веб-приложений.</div></div>
+        <div class="block protected" draggable="true" data-protected="experience"><div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div><div class="section-title" contenteditable="true">Work experience</div><div class="job-header"><div class="job-title" contenteditable="true">Senior Developer</div><div class="job-date" contenteditable="true">Январь 2022 — Настоящее время</div></div><div class="job-company" contenteditable="true">Компания 1</div><div class="job-description" contenteditable="true">• Разработал систему X<br>• Внедрил автоматизированное тестирование</div><div class="tech-stack"><span class="tech-label">Tech Stack:</span> Go, PostgreSQL, Docker</div></div>
+        <div class="block" draggable="true"><div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div><div class="section-title" contenteditable="true">Education</div><div class="edu-name" contenteditable="true">Московский Государственный Университет, Бакалавр 2019</div></div>
+      </div>
+      <div class="side-column" id="sideColumn">
+        <div class="block protected" draggable="true" data-protected="contacts"><div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div><div class="side-section-title" contenteditable="true">Contacts</div><div class="contact-item"><a href="https://t.me/username">t.me/username</a></div><div class="contact-item"><a href="https://linkedin.com/in/username">linkedin.com/in/username</a></div></div>
+        <div class="block protected" draggable="true" data-protected="languages"><div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div><div class="side-section-title" contenteditable="true">Languages</div><div id="languagesContainer"><div class="lang-item"><div contenteditable="true">Русский</div><div class="lang-level" contenteditable="true">Родной</div><button class="delete-lang" onclick="deleteLang(this)">✕</button></div><div class="lang-item"><div contenteditable="true">English</div><div class="lang-level" contenteditable="true">B2</div><button class="delete-lang" onclick="deleteLang(this)">✕</button></div></div></div>
+        <div class="block protected" draggable="true" data-protected="skills"><div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div><div class="side-section-title" contenteditable="true">Skills</div><div id="skillsContainer" class="skills-cloud"><span class="skill-tag" contenteditable="true">Go</span><span class="skill-tag" contenteditable="true">Python</span><span class="skill-tag" contenteditable="true">PostgreSQL</span><span class="skill-tag" contenteditable="true">Docker</span></div></div>
+      </div>`;
+
+    function loadFromStorage() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const settings = localStorage.getItem(SETTINGS_KEY);
+      if (saved) { document.getElementById('resume').innerHTML = saved; reinitAll(); }
+      if (settings) {
+        const s = JSON.parse(settings);
+        if (s.fontFamily) { document.getElementById('fontFamily').value = s.fontFamily; document.getElementById('resume').style.fontFamily = s.fontFamily; }
+        if (s.fontSize) { document.getElementById('fontSize').value = s.fontSize; applyFontSize(s.fontSize); }
+        if (s.lineHeight) { document.getElementById('lineHeight').value = s.lineHeight; document.getElementById('resume').style.lineHeight = s.lineHeight; }
+        if (s.accentColor) { document.getElementById('accentColor').value = s.accentColor; applyAccentColor(s.accentColor); }
+        if (s.sideBg) { document.getElementById('sideBg').value = s.sideBg; document.querySelector('.side-column').style.background = s.sideBg; }
+        if (s.sideText) { document.getElementById('sideText').value = s.sideText; applySideTextColor(s.sideText); }
+        if (s.tagBg) { document.getElementById('tagBg').value = s.tagBg; applyTagBg(s.tagBg); }
+      }
+    }
+    
+    function saveToStorage() {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        localStorage.setItem(STORAGE_KEY, document.getElementById('resume').innerHTML);
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+          fontFamily: document.getElementById('fontFamily').value, fontSize: document.getElementById('fontSize').value,
+          lineHeight: document.getElementById('lineHeight').value, accentColor: document.getElementById('accentColor').value,
+          sideBg: document.getElementById('sideBg').value, sideText: document.getElementById('sideText').value,
+          tagBg: document.getElementById('tagBg').value
+        }));
+      }, 300);
+    }
+    
+    function saveState() {
+      if (isUndoRedo) return;
+      const state = document.getElementById('resume').innerHTML;
+      if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
+      history.push(state);
+      if (history.length > 50) history.shift();
+      historyIndex = history.length - 1;
+      updateButtons(); saveToStorage();
+    }
+    
+    function undo() { if (historyIndex > 0) { isUndoRedo = true; historyIndex--; document.getElementById('resume').innerHTML = history[historyIndex]; reinitAll(); isUndoRedo = false; updateButtons(); saveToStorage(); } }
+    function redo() { if (historyIndex < history.length - 1) { isUndoRedo = true; historyIndex++; document.getElementById('resume').innerHTML = history[historyIndex]; reinitAll(); isUndoRedo = false; updateButtons(); saveToStorage(); } }
+    function updateButtons() { document.getElementById('undoBtn').disabled = historyIndex <= 0; document.getElementById('redoBtn').disabled = historyIndex >= history.length - 1; }
+    
+    function reinitAll() {
+      document.querySelectorAll('.block').forEach(initDragDrop);
+      document.querySelectorAll('[contenteditable]').forEach(el => { el.removeEventListener('input', saveState); el.addEventListener('input', saveState); });
+    }
+    
+    function applyFontSize(size) { document.querySelectorAll('.job-description, .tech-stack, .skill-tag, .lang-item, .contact-item, .summary, .edu-name, .edu-details').forEach(el => el.style.fontSize = size + 'px'); }
+    function applyAccentColor(color) { 
+      document.querySelectorAll('.section-title').forEach(el => el.style.borderBottomColor = color); 
+      document.querySelectorAll('.job-company').forEach(el => el.style.color = color); 
+      const sideCol = document.querySelector('.side-column');
+      if (sideCol) sideCol.style.borderLeftColor = color;
+    }
+    function applySideTextColor(color) { const side = document.querySelector('.side-column'); if(side) { side.style.color = color; side.querySelectorAll('.contact-item a').forEach(el => el.style.color = color); } }
+    
+    loadFromStorage(); saveState();
+    document.querySelectorAll('[contenteditable]').forEach(el => el.addEventListener('input', saveState));
+    
+    let draggedElement = null;
+    document.querySelectorAll('.block').forEach(initDragDrop);
+    
+    function initDragDrop(block) {
+      block.addEventListener('dragstart', e => { draggedElement = block; block.classList.add('dragging'); });
+      block.addEventListener('dragend', () => { block.classList.remove('dragging'); document.querySelectorAll('.block').forEach(b => b.classList.remove('drag-over')); saveState(); });
+      block.addEventListener('dragover', e => { e.preventDefault(); if (draggedElement !== block) block.classList.add('drag-over'); });
+      block.addEventListener('dragleave', () => block.classList.remove('drag-over'));
+      block.addEventListener('drop', e => { e.preventDefault(); if (draggedElement !== block && draggedElement.parentElement === block.parentElement) { const parent = block.parentElement; const blocks = [...parent.querySelectorAll('.block')]; if (blocks.indexOf(draggedElement) < blocks.indexOf(block)) block.after(draggedElement); else block.before(draggedElement); } block.classList.remove('drag-over'); });
+    }
+    
+    document.getElementById('fontFamily').addEventListener('change', e => { document.getElementById('resume').style.fontFamily = e.target.value; saveState(); });
+    document.getElementById('fontSize').addEventListener('input', e => { applyFontSize(e.target.value); saveState(); });
+    document.getElementById('lineHeight').addEventListener('input', e => { document.getElementById('resume').style.lineHeight = e.target.value; saveState(); });
+    document.getElementById('accentColor').addEventListener('input', e => { applyAccentColor(e.target.value); saveState(); });
+    document.getElementById('sideBg').addEventListener('input', e => { document.querySelector('.side-column').style.background = e.target.value; saveState(); });
+    document.getElementById('sideText').addEventListener('input', e => { applySideTextColor(e.target.value); saveState(); });
+    document.getElementById('tagBg').addEventListener('input', e => { applyTagBg(e.target.value); saveState(); });
+    
+    function applyTagBg(color) { document.querySelectorAll('.skill-tag').forEach(el => { el.style.background = color; el.style.borderColor = color === 'transparent' || color.includes('00') ? 'rgba(0,0,0,0.2)' : 'transparent'; }); }
+    
+    function deleteBlock(btn) { 
+      const block = btn.closest('.block');
+      if (block.dataset.protected) {
+        alert('This block cannot be deleted, only cleared');
+        return;
+      }
+      block.remove(); 
+      saveState(); 
+    }
+    
+    function clearBlock(btn) {
+      const block = btn.closest('.block');
+      const protectedType = block.dataset.protected;
+      
+      if (protectedType === 'header') {
+        block.querySelector('.name').innerHTML = 'Your Name';
+        block.querySelector('.title').innerHTML = 'Job Title | email@example.com | +1 234 567-8900';
+        block.querySelector('.contact-info').innerHTML = 'City, Country';
+      } else if (protectedType === 'about') {
+        block.querySelector('.summary').innerHTML = 'Brief description about yourself...';
+      } else if (protectedType === 'experience') {
+        block.querySelector('.job-title').innerHTML = 'Job Title';
+        block.querySelector('.job-date').innerHTML = 'Month Year — Present';
+        block.querySelector('.job-company').innerHTML = 'Company Name';
+        block.querySelector('.job-description').innerHTML = '• Achievement 1<br>• Achievement 2';
+        const techStack = block.querySelector('.tech-stack');
+        if (techStack) techStack.innerHTML = '<span class="tech-label">Tech Stack:</span> Tech1, Tech2, Tech3';
+      } else if (protectedType === 'contacts') {
+        const items = block.querySelectorAll('.contact-item');
+        items.forEach(item => item.innerHTML = '<a href="https://example.com">example.com/username</a>');
+      } else if (protectedType === 'languages') {
+        const container = block.querySelector('#languagesContainer');
+        if (container) container.innerHTML = '<div class="lang-item"><div contenteditable="true">Language</div><div class="lang-level" contenteditable="true">Level</div><button class="delete-lang" onclick="deleteLang(this)">✕</button></div>';
+      } else if (protectedType === 'skills') {
+        const container = block.querySelector('#skillsContainer');
+        if (container) container.innerHTML = '<span class="skill-tag" contenteditable="true">Skill</span>';
+      }
+      
+      reinitAll();
+      saveState();
+    }
+    
+    function addBlock(column) {
+      const block = document.createElement('div'); block.className = 'block'; block.draggable = true;
+      block.innerHTML = `<div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div><div class="${column === 'main' ? 'section-title' : 'side-section-title'}" contenteditable="true">New Section</div><div class="${column === 'main' ? 'job-description' : 'lang-item'}" contenteditable="true">Edit content...</div>`;
+      document.getElementById(column === 'main' ? 'mainColumn' : 'sideColumn').appendChild(block);
+      initDragDrop(block); block.querySelectorAll('[contenteditable]').forEach(el => el.addEventListener('input', saveState)); saveState();
+    }
+    
+    function addJobBlock() {
+      const block = document.createElement('div'); block.className = 'block'; block.draggable = true;
+      block.innerHTML = `<div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div><div class="job-header"><div class="job-title" contenteditable="true">Job Title</div><div class="job-date" contenteditable="true">Month Year — Present</div></div><div class="job-company" contenteditable="true">Company Name</div><div class="job-description" contenteditable="true">• Achievement 1<br>• Achievement 2<br>• Achievement 3</div><div class="tech-stack"><span class="tech-label">Tech Stack:</span> <span contenteditable="true">Tech1, Tech2, Tech3</span></div>`;
+      const expBlock = document.querySelector('[data-protected="experience"]');
+      if (expBlock) expBlock.after(block);
+      else document.getElementById('mainColumn').appendChild(block);
+      initDragDrop(block); block.querySelectorAll('[contenteditable]').forEach(el => el.addEventListener('input', saveState)); saveState();
+    }
+    
+    function addSkill() {
+      let container = document.getElementById('skillsContainer');
+      if (!container) {
+        const skillsBlock = document.querySelector('[data-protected="skills"]');
+        if (skillsBlock) {
+          container = document.createElement('div');
+          container.id = 'skillsContainer';
+          container.className = 'skills-cloud';
+          skillsBlock.appendChild(container);
+        } else return;
+      }
+      const skill = document.createElement('span'); 
+      skill.className = 'skill-tag'; 
+      skill.contentEditable = true;
+      skill.textContent = 'New';
+      container.appendChild(skill); 
+      skill.addEventListener('input', saveState); 
+      skill.focus();
+      saveState();
+    }
+    
+    function addLanguage() {
+      let container = document.getElementById('languagesContainer');
+      if (!container) {
+        const langBlock = document.querySelector('[data-protected="languages"]');
+        if (langBlock) {
+          container = document.createElement('div');
+          container.id = 'languagesContainer';
+          langBlock.appendChild(container);
+        } else return;
+      }
+      const lang = document.createElement('div');
+      lang.className = 'lang-item';
+      lang.innerHTML = '<div contenteditable="true">Language</div><div class="lang-level" contenteditable="true">Level</div><button class="delete-lang" onclick="deleteLang(this)">✕</button>';
+      container.appendChild(lang);
+      lang.querySelectorAll('[contenteditable]').forEach(el => el.addEventListener('input', saveState));
+      lang.querySelector('[contenteditable]').focus();
+      saveState();
+    }
+    
+    function deleteLang(btn) {
+      const langItem = btn.closest('.lang-item');
+      const container = langItem.parentElement;
+      if (container.children.length > 1) {
+        langItem.remove();
+        saveState();
+      } else {
+        alert('At least one language must remain');
+      }
+    }
+    
+    function formatText(command) {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        let container = range.commonAncestorContainer;
+        if (container.nodeType === 3) container = container.parentNode;
+        const editable = container.closest('[contenteditable="true"]');
+        if (editable) {
+          editable.focus();
+          document.execCommand(command, false, null);
+          saveState();
+        }
+      }
+    }
+    
+    function addLink() {
+      const selection = window.getSelection();
+      if (!selection || selection.toString().trim() === '') {
+        alert('Сначала выдели текст');
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      let container = range.commonAncestorContainer;
+      if (container.nodeType === 3) container = container.parentNode;
+      const editable = container.closest('[contenteditable="true"]');
+      if (!editable) {
+        alert('Выдели текст в редактируемой области');
+        return;
+      }
+      const url = prompt('Введи URL:', 'https://');
+      if (url && url !== 'https://') {
+        editable.focus();
+        const newRange = document.createRange();
+        newRange.setStart(range.startContainer, range.startOffset);
+        newRange.setEnd(range.endContainer, range.endOffset);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+        document.execCommand('createLink', false, url);
+        saveState();
+      }
+    }
+    
+    function closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
+    function showSaveModal() { document.getElementById('saveModal').classList.add('active'); document.getElementById('saveName').focus(); }
+    function showLoadModal() { renderResumeList(); document.getElementById('loadModal').classList.add('active'); }
+    function showNewModal() { document.getElementById('newModal').classList.add('active'); }
+    
+    function getResumeList() { return JSON.parse(localStorage.getItem(LIST_KEY) || '[]'); }
+    function setResumeList(list) { localStorage.setItem(LIST_KEY, JSON.stringify(list)); }
+    
+    function saveResume() {
+      const name = document.getElementById('saveName').value.trim();
+      if (!name) { alert('Please enter a name'); return; }
+      const list = getResumeList();
+      const existing = list.findIndex(r => r.name === name);
+      const data = { name, content: document.getElementById('resume').innerHTML, settings: { fontFamily: document.getElementById('fontFamily').value, fontSize: document.getElementById('fontSize').value, lineHeight: document.getElementById('lineHeight').value, accentColor: document.getElementById('accentColor').value, sideBg: document.getElementById('sideBg').value, sideText: document.getElementById('sideText').value }, date: new Date().toISOString() };
+      if (existing >= 0) { if (confirm('Resume with this name exists. Overwrite?')) list[existing] = data; else return; } else list.push(data);
+      setResumeList(list); document.getElementById('saveName').value = ''; closeModals(); alert('Saved!');
+    }
+    
+    function loadResume(name) {
+      const list = getResumeList(); const r = list.find(x => x.name === name);
+      if (r) {
+        document.getElementById('resume').innerHTML = r.content; reinitAll();
+        if (r.settings) {
+          const s = r.settings;
+          document.getElementById('fontFamily').value = s.fontFamily || 'Segoe UI'; document.getElementById('resume').style.fontFamily = s.fontFamily || 'Segoe UI';
+          document.getElementById('fontSize').value = s.fontSize || 8; applyFontSize(s.fontSize || 8);
+          document.getElementById('lineHeight').value = s.lineHeight || 1.3; document.getElementById('resume').style.lineHeight = s.lineHeight || 1.3;
+          document.getElementById('accentColor').value = s.accentColor || '#e94560'; applyAccentColor(s.accentColor || '#e94560');
+          document.getElementById('sideBg').value = s.sideBg || '#2d3436'; document.querySelector('.side-column').style.background = s.sideBg || '#2d3436';
+          document.getElementById('sideText').value = s.sideText || '#ffffff'; applySideTextColor(s.sideText || '#ffffff');
+          if (s.tagBg) { document.getElementById('tagBg').value = s.tagBg; applyTagBg(s.tagBg); }
+        }
+        history = []; historyIndex = -1; saveState(); closeModals();
+      }
+    }
+    
+    function deleteResume(name) { if (confirm(`Delete "${name}"?`)) { setResumeList(getResumeList().filter(r => r.name !== name)); renderResumeList(); } }
+    
+    function renderResumeList() {
+      const list = getResumeList(); const ul = document.getElementById('resumeList');
+      if (list.length === 0) { ul.innerHTML = '<li class="empty">No saved resumes</li>'; return; }
+      ul.innerHTML = list.map(r => `<li><span onclick="loadResume('${r.name}')">${r.name}</span><button class="delete-btn" onclick="deleteResume('${r.name}')">✕</button></li>`).join('');
+    }
+    
+    function createNewResume() { document.getElementById('resume').innerHTML = defaultResume; reinitAll(); history = []; historyIndex = -1; saveState(); closeModals(); }
+    
+    function exportPDF() {
+      const element = document.getElementById('resume'), sideBg = document.getElementById('sideBg').value, sideText = document.getElementById('sideText').value, accentColor = document.getElementById('accentColor').value;
+      document.querySelectorAll('.block-controls, .delete-lang').forEach(c => c.style.display = 'none');
+      document.querySelectorAll('.block').forEach(b => { b.style.border = 'none'; b.style.cursor = 'default'; });
+      const styles = [...document.querySelectorAll('style')].map(s => s.innerHTML).join('');
+      const printWindow = window.open('', '_blank');
+      const tagBg = document.getElementById('tagBg').value;
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Resume</title><style>${styles} * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } body { background: #fff; margin: 0; } .resume-container { margin: 0; padding: 0; } .resume { box-shadow: none; margin: 0 auto; } .block { border: none !important; cursor: default; padding: 3px; } .block-controls, .modal, .delete-lang { display: none !important; } .side-column { background: ${sideBg} !important; color: ${sideText} !important; border-left: 3px solid ${accentColor} !important; } .side-column a { color: ${sideText} !important; } .section-title { border-bottom: 2px solid ${accentColor} !important; } .job-company { color: ${accentColor} !important; } .skill-tag { background: ${tagBg} !important; } .lang-item { padding-right: 0; } @page { margin: 0; size: A4; } @media print { * { -webkit-print-color-adjust: exact !important; } .side-column { background: ${sideBg} !important; border-left-color: ${accentColor} !important; } .skill-tag { background: ${tagBg} !important; } }</style></head><body><div class="resume-container">${element.outerHTML}</div></body></html>`);
+      printWindow.document.close();
+      setTimeout(() => { printWindow.print(); document.querySelectorAll('.block-controls, .delete-lang').forEach(c => c.style.display = ''); document.querySelectorAll('.block').forEach(b => { b.style.border = ''; b.style.cursor = ''; }); }, 300);
+    }
+    
+    document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); } });
+    document.addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModals(); });
+  </script>
+</body>
+</html>
