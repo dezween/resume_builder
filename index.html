@@ -21,7 +21,7 @@
     .toolbar button.secondary:hover { background: #1a4a7a; }
     .toolbar button:disabled { background: #444; cursor: not-allowed; opacity: 0.5; }
     
-    .resume-container { margin-top: 70px; padding: 20px; display: flex; justify-content: center; }
+    .resume-container { margin-top: 60px; padding: 20px; display: flex; justify-content: center; }
     .resume { width: 210mm; min-height: 297mm; background: #fff; display: grid; grid-template-columns: 1fr 170px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
     .main-column { padding: 18px 22px; background: #fff; }
     .side-column { background: #2d3436; color: #fff; padding: 18px 12px; border-left: 3px solid #e94560; }
@@ -68,6 +68,13 @@
     .edu-item { margin-bottom: 5px; }
     .edu-name { font-size: 8px; }
     .edu-details { font-size: 7px; opacity: 0.7; }
+    
+    .hidden-tags-block { margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.3); }
+    .hidden-tags-title { font-size: 8px; opacity: 0.7; margin-bottom: 4px; color: #f39c12; }
+    .hidden-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+    .hidden-tag { font-size: 8px; padding: 2px 5px; border-radius: 3px; cursor: default; border: 1px dashed rgba(255,255,255,0.4); background: transparent !important; }
+    .hidden-tag.preview-mode { opacity: 1; }
+    .hidden-tag.print-mode { font-size: 1px; border: none; opacity: 0.01; }
     
     .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
     .modal.active { display: flex; }
@@ -123,6 +130,8 @@
       <input type="color" id="sideText" value="#ffffff">
       <label>Tag:</label>
       <input type="color" id="tagBg" value="#ffffff26">
+      <label>ATS sz:</label>
+      <input type="number" id="atsSize" value="1" min="1" max="10" style="width:35px">
     </div>
     <div class="toolbar-group">
       <button class="secondary" onmousedown="event.preventDefault(); formatText('bold')" title="Bold"><b>B</b></button>
@@ -134,12 +143,14 @@
       <button class="secondary" onclick="addJobBlock()">+Job</button>
       <button class="secondary" onclick="addSkill()">+Tag</button>
       <button class="secondary" onclick="addLanguage()">+Lang</button>
+      <button class="secondary" onclick="addHiddenTag()">+ATS</button>
       <button class="secondary" onclick="addBlock('main')">+Sec</button>
     </div>
     <div class="toolbar-group">
       <button class="secondary" onclick="showNewModal()">📄</button>
       <button class="secondary" onclick="showSaveModal()">💾</button>
       <button class="secondary" onclick="showLoadModal()">📂</button>
+      <button class="secondary" onclick="clearAllStorage()" title="Clear all data">🗑️</button>
       <button onclick="exportPDF()">PDF</button>
     </div>
   </div>
@@ -201,7 +212,7 @@
           </div>
           <div class="job-company" contenteditable="true">Avenga</div>
           <div class="job-description" contenteditable="true">• Developed CRM system for online schools with Golang, Kafka, PostgreSQL, supporting 10+ microservices.<br>• Streamed user activity data on tests and videos to ClickHouse for analytics via Kafka.<br>• Built endpoints for mentor scheduling and workload; wrote SQL queries to calculate mentor earnings.<br>• Integrated accounting and payroll data with SAP.<br>• Created leaderboards with daily achievement tracking for students using cron jobs.<br>• Added course performance metrics to Grafana, including test completions and error tracking.<br>• Fixed service configurations with Helm and resolved Kubernetes issues using log analysis.</div>
-          <div class="tech-stack"><span class="tech-label">Tech Stack:</span> Golang, PostgreSQL, Kafka, Redis, Docker, GitLab CI/CD, Testify, Linux, Kubernetes, Prometheus, Grafana, gRPC, ELK, ClickHouse</div>
+          <div class="tech-stack" contenteditable="true"><span class="tech-label">Tech Stack:</span> Golang, PostgreSQL, Kafka, Redis, Docker, GitLab CI/CD, Testify, Linux, Kubernetes, Prometheus, Grafana, gRPC, ELK, ClickHouse</div>
         </div>
         
         <div class="block" draggable="true">
@@ -275,6 +286,20 @@
             <span class="skill-tag" contenteditable="true">GitLab CI</span>
             <span class="skill-tag" contenteditable="true">Kubernetes</span>
           </div>
+          <div class="hidden-tags-block">
+            <div class="hidden-tags-title">⚡ ATS Keywords (visible while editing, tiny in PDF)</div>
+            <div id="hiddenTagsContainer" class="hidden-tags">
+              <span class="hidden-tag" contenteditable="true">Git</span>
+              <span class="hidden-tag" contenteditable="true">GitFlow</span>
+              <span class="hidden-tag" contenteditable="true">CI/CD</span>
+              <span class="hidden-tag" contenteditable="true">Linux</span>
+              <span class="hidden-tag" contenteditable="true">Bash</span>
+              <span class="hidden-tag" contenteditable="true">REST API</span>
+              <span class="hidden-tag" contenteditable="true">Microservices</span>
+              <span class="hidden-tag" contenteditable="true">Agile</span>
+              <span class="hidden-tag" contenteditable="true">Scrum</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -309,6 +334,7 @@
         if (s.sideBg) { document.getElementById('sideBg').value = s.sideBg; document.querySelector('.side-column').style.background = s.sideBg; }
         if (s.sideText) { document.getElementById('sideText').value = s.sideText; applySideTextColor(s.sideText); }
         if (s.tagBg) { document.getElementById('tagBg').value = s.tagBg; applyTagBg(s.tagBg); }
+        if (s.atsSize) { document.getElementById('atsSize').value = s.atsSize; }
       }
     }
     
@@ -320,7 +346,8 @@
           fontFamily: document.getElementById('fontFamily').value, fontSize: document.getElementById('fontSize').value,
           lineHeight: document.getElementById('lineHeight').value, accentColor: document.getElementById('accentColor').value,
           sideBg: document.getElementById('sideBg').value, sideText: document.getElementById('sideText').value,
-          tagBg: document.getElementById('tagBg').value
+          tagBg: document.getElementById('tagBg').value,
+          atsSize: document.getElementById('atsSize').value
         }));
       }, 300);
     }
@@ -373,7 +400,30 @@
     document.getElementById('accentColor').addEventListener('input', e => { applyAccentColor(e.target.value); saveState(); });
     document.getElementById('sideBg').addEventListener('input', e => { document.querySelector('.side-column').style.background = e.target.value; saveState(); });
     document.getElementById('sideText').addEventListener('input', e => { applySideTextColor(e.target.value); saveState(); });
+    function addHiddenTag() {
+      let container = document.getElementById('hiddenTagsContainer');
+      if (!container) {
+        const skillsBlock = document.querySelector('[data-protected="skills"]');
+        if (skillsBlock) {
+          const hiddenBlock = document.createElement('div');
+          hiddenBlock.className = 'hidden-tags-block';
+          hiddenBlock.innerHTML = '<div class="hidden-tags-title">⚡ ATS Keywords (visible while editing, tiny in PDF)</div><div id="hiddenTagsContainer" class="hidden-tags"></div>';
+          skillsBlock.appendChild(hiddenBlock);
+          container = document.getElementById('hiddenTagsContainer');
+        } else return;
+      }
+      const tag = document.createElement('span');
+      tag.className = 'hidden-tag';
+      tag.contentEditable = true;
+      tag.textContent = 'keyword';
+      container.appendChild(tag);
+      tag.addEventListener('input', saveState);
+      tag.focus();
+      saveState();
+    }
+    
     document.getElementById('tagBg').addEventListener('input', e => { applyTagBg(e.target.value); saveState(); });
+    document.getElementById('atsSize').addEventListener('input', e => { saveState(); });
     
     function applyTagBg(color) { document.querySelectorAll('.skill-tag').forEach(el => { el.style.background = color; el.style.borderColor = color === 'transparent' || color.includes('00') ? 'rgba(0,0,0,0.2)' : 'transparent'; }); }
     
@@ -413,6 +463,8 @@
       } else if (protectedType === 'skills') {
         const container = block.querySelector('#skillsContainer');
         if (container) container.innerHTML = '<span class="skill-tag" contenteditable="true">Skill</span>';
+        const hiddenContainer = block.querySelector('#hiddenTagsContainer');
+        if (hiddenContainer) hiddenContainer.innerHTML = '<span class="hidden-tag" contenteditable="true">keyword</span>';
       }
       
       reinitAll();
@@ -428,7 +480,7 @@
     
     function addJobBlock() {
       const block = document.createElement('div'); block.className = 'block'; block.draggable = true;
-      block.innerHTML = `<div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div><div class="job-header"><div class="job-title" contenteditable="true">Job Title</div><div class="job-date" contenteditable="true">Month Year — Present</div></div><div class="job-company" contenteditable="true">Company Name</div><div class="job-description" contenteditable="true">• Achievement 1<br>• Achievement 2<br>• Achievement 3</div><div class="tech-stack"><span class="tech-label">Tech Stack:</span> <span contenteditable="true">Tech1, Tech2, Tech3</span></div>`;
+      block.innerHTML = `<div class="block-controls"><button onclick="deleteBlock(this)">✕</button></div><div class="job-header"><div class="job-title" contenteditable="true">Job Title</div><div class="job-date" contenteditable="true">Month Year — Present</div></div><div class="job-company" contenteditable="true">Company Name</div><div class="job-description" contenteditable="true">• Achievement 1<br>• Achievement 2<br>• Achievement 3</div><div class="tech-stack" contenteditable="true"><span class="tech-label">Tech Stack:</span> <span contenteditable="true">Tech1, Tech2, Tech3</span></div>`;
       const expBlock = document.querySelector('[data-protected="experience"]');
       if (expBlock) expBlock.after(block);
       else document.getElementById('mainColumn').appendChild(block);
@@ -574,6 +626,15 @@
     
     function createNewResume() { document.getElementById('resume').innerHTML = defaultResume; reinitAll(); history = []; historyIndex = -1; saveState(); closeModals(); }
     
+    function clearAllStorage() {
+      if (confirm('Clear ALL saved data? This will delete:\n- Current resume\n- All saved resumes\n- All settings\n\nThis cannot be undone!')) {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(SETTINGS_KEY);
+        localStorage.removeItem(LIST_KEY);
+        location.reload();
+      }
+    }
+    
     function exportPDF() {
       const element = document.getElementById('resume'), sideBg = document.getElementById('sideBg').value, sideText = document.getElementById('sideText').value, accentColor = document.getElementById('accentColor').value;
       document.querySelectorAll('.block-controls, .delete-lang').forEach(c => c.style.display = 'none');
@@ -581,7 +642,9 @@
       const styles = [...document.querySelectorAll('style')].map(s => s.innerHTML).join('');
       const printWindow = window.open('', '_blank');
       const tagBg = document.getElementById('tagBg').value;
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>Resume</title><style>${styles} * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } body { background: #fff; margin: 0; } .resume-container { margin: 0; padding: 0; } .resume { box-shadow: none; margin: 0 auto; } .block { border: none !important; cursor: default; padding: 3px; } .block-controls, .modal, .delete-lang { display: none !important; } .side-column { background: ${sideBg} !important; color: ${sideText} !important; border-left: 3px solid ${accentColor} !important; } .side-column a { color: ${sideText} !important; } .section-title { border-bottom: 2px solid ${accentColor} !important; } .job-company { color: ${accentColor} !important; } .skill-tag { background: ${tagBg} !important; } .lang-item { padding-right: 0; } @page { margin: 0; size: A4; } @media print { * { -webkit-print-color-adjust: exact !important; } .side-column { background: ${sideBg} !important; border-left-color: ${accentColor} !important; } .skill-tag { background: ${tagBg} !important; } }</style></head><body><div class="resume-container">${element.outerHTML}</div></body></html>`);
+      const atsSize = document.getElementById('atsSize').value;
+      const sideBgColor = sideBg;
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Resume</title><style>${styles} * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } body { background: #fff; margin: 0; } .resume-container { margin: 0; padding: 0; } .resume { box-shadow: none; margin: 0 auto; } .block { border: none !important; cursor: default; padding: 3px; } .block-controls, .modal, .delete-lang { display: none !important; } .side-column { background: ${sideBg} !important; color: ${sideText} !important; border-left: 3px solid ${accentColor} !important; } .side-column a { color: ${sideText} !important; } .section-title { border-bottom: 2px solid ${accentColor} !important; } .job-company { color: ${accentColor} !important; } .skill-tag { background: ${tagBg} !important; } .hidden-tags-title { display: none !important; } .hidden-tags-block { border: none !important; margin: 0 !important; padding: 0 !important; } .hidden-tag { font-size: ${atsSize}px !important; color: ${sideBgColor} !important; background: ${sideBgColor} !important; border: none !important; padding: 0 1px !important; margin: 0 !important; opacity: 1 !important; } .lang-item { padding-right: 0; } @page { margin: 0; size: A4; } @media print { * { -webkit-print-color-adjust: exact !important; } .side-column { background: ${sideBg} !important; border-left-color: ${accentColor} !important; } .skill-tag { background: ${tagBg} !important; } .hidden-tag { font-size: ${atsSize}px !important; color: ${sideBgColor} !important; background: ${sideBgColor} !important; } }</style></head><body><div class="resume-container">${element.outerHTML}</div></body></html>`);
       printWindow.document.close();
       setTimeout(() => { printWindow.print(); document.querySelectorAll('.block-controls, .delete-lang').forEach(c => c.style.display = ''); document.querySelectorAll('.block').forEach(b => { b.style.border = ''; b.style.cursor = ''; }); }, 300);
     }
