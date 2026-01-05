@@ -143,6 +143,7 @@
       <button class="secondary" onclick="addJobBlock()">+Job</button>
       <button class="secondary" onclick="addSkill()">+Tag</button>
       <button class="secondary" onclick="addLanguage()">+Lang</button>
+      <button class="secondary" onclick="addContact()">+Contact</button>
       <button class="secondary" onclick="addHiddenTag()">+ATS</button>
       <button class="secondary" onclick="addBlock('main')">+Sec</button>
     </div>
@@ -253,8 +254,8 @@
         <div class="block protected" draggable="true" data-protected="contacts">
           <div class="block-controls"><button class="clear-btn" onclick="clearBlock(this)" title="Clear">⌫</button></div>
           <div class="side-section-title" contenteditable="true">Contacts</div>
-          <div class="contact-item"><a href="https://t.me/invicto_via">https://t.me/invicto_via</a></div>
-          <div class="contact-item"><a href="https://www.linkedin.com/in/vyacheslav-titov/">www.linkedin.com/in/vyacheslav-titov</a></div>
+          <div class="contact-item" contenteditable="true">https://t.me/invicto_via</div>
+          <div class="contact-item" contenteditable="true">www.linkedin.com/in/vyacheslav-titov</div>
         </div>
         
         <div class="block protected" draggable="true" data-protected="languages">
@@ -400,6 +401,19 @@
     document.getElementById('accentColor').addEventListener('input', e => { applyAccentColor(e.target.value); saveState(); });
     document.getElementById('sideBg').addEventListener('input', e => { document.querySelector('.side-column').style.background = e.target.value; saveState(); });
     document.getElementById('sideText').addEventListener('input', e => { applySideTextColor(e.target.value); saveState(); });
+    function addContact() {
+      const contactsBlock = document.querySelector('[data-protected="contacts"]');
+      if (!contactsBlock) return;
+      const contact = document.createElement('div');
+      contact.className = 'contact-item';
+      contact.contentEditable = true;
+      contact.textContent = 'contact@example.com';
+      contactsBlock.appendChild(contact);
+      contact.addEventListener('input', saveState);
+      contact.focus();
+      saveState();
+    }
+    
     function addHiddenTag() {
       let container = document.getElementById('hiddenTagsContainer');
       if (!container) {
@@ -456,7 +470,9 @@
         if (techStack) techStack.innerHTML = '<span class="tech-label">Tech Stack:</span> Tech1, Tech2, Tech3';
       } else if (protectedType === 'contacts') {
         const items = block.querySelectorAll('.contact-item');
-        items.forEach(item => item.innerHTML = '<a href="https://example.com">example.com/username</a>');
+        items.forEach((item, i) => {
+          item.textContent = i === 0 ? 'email@example.com' : 'linkedin.com/in/username';
+        });
       } else if (protectedType === 'languages') {
         const container = block.querySelector('#languagesContainer');
         if (container) container.innerHTML = '<div class="lang-item"><div contenteditable="true">Language</div><div class="lang-level" contenteditable="true">Level</div><button class="delete-lang" onclick="deleteLang(this)">✕</button></div>';
